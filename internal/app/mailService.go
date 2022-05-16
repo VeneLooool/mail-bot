@@ -6,19 +6,24 @@ import (
 	"fmt"
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
+	homework_2 "gitlab.ozon.dev/VeneLooool/homework-2/api"
 	"io/ioutil"
 	"log"
 	"net/mail"
 	"strings"
+	"sync"
+	"time"
 )
 
 type UserMailService struct {
-	nameMailServ string
-	password     string
-	username     string
-	isLogin      bool
-	client       *client.Client
-	Data         ThisData
+	nameMailServ     string
+	password         string
+	username         string
+	isLogin          bool
+	constantlyUpdate bool
+	constUpdateChan  chan bool
+	client           *client.Client
+	Data             ThisData
 }
 type ThisData struct {
 	mailboxes chan *imap.MailboxInfo
@@ -63,13 +68,13 @@ func (mailServ *UserMailService) GetAllMailBoxes() (result []imap.MailboxInfo, e
 
 	return result, nil
 }
-func (mailServ *UserMailService) CheckForUpdate(mailBoxName string) error {
-	if _, err := mailServ.client.Select(mailBoxName, false); err != nil {
+func (mailServ *UserMailService) CheckForUpdate(user *User, mutexUpdate *sync.Mutex) error {
+	mailBox, err := mailServ.client.Select("INBOX", false)
+	if err != nil {
 		return err
 	}
 
 	mailServ.client.Updates = mailServ.Data.Updates
-	//stopped := false
 	stop := make(chan struct{})
 	done := make(chan error, 1)
 	go func() {
@@ -77,21 +82,41 @@ func (mailServ *UserMailService) CheckForUpdate(mailBoxName string) error {
 	}()
 	for {
 		select {
-		case update := <-mailServ.Data.Updates:
-			log.Println("New update:", update)
-			mailServ.Data.NewUpdate <- true
-			/*if !stopped {
+		case <-mailServ.Data.Updates:
+			fmt.Println("New updated")
+			close(stop)
+			time.Sleep(time.Second * 5)
+			_, body, err := mailServ.GetLastMessagesFromMailBox(mailBox)
+			if err != nil {
+				panic(err)
+			}
+			message := &homework_2.MailMessages{
+				MailServiceName: mailServ.nameMailServ,
+				UserName:        mailServ.username,
+				MessageHeader:   "",
+				MessageBody:     body,
+			}
+			mutexUpdate.Lock()
+			user.updates = append(user.updates, message)
+			mutexUpdate.Unlock()
+			time.Sleep(time.Second * 100)
+			stop = make(chan struct{})
+			done = make(chan error, 1)
+			go func() {
+				done <- mailServ.client.Idle(stop, nil)
+			}()
+		case constUpdate := <-mailServ.constUpdateChan:
+			fmt.Println("Я закрылся")
+			if !constUpdate {
 				close(stop)
-				stopped = true
-			}*/
+				return nil
+			}
 		case err := <-done:
 			if err != nil {
 				return err
 			}
-			log.Println("Not idling anymore")
 		}
 	}
-
 }
 
 func (mailServ *UserMailService) ConnectToService() error {
@@ -133,13 +158,14 @@ func (mailServ *UserMailService) LogoutFromService() error {
 	return nil
 }
 
-func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBoxName string) (header mail.Header, bodyMessage string, err error) {
-	mailBox, err := mailServ.client.Select(mailBoxName, false)
-	if err != nil {
-		return nil, "", err
-	}
+//TODO должно быть n количество последних сообщений
+func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBox *imap.MailboxStatus) (header mail.Header, bodyMessage string, err error) {
+	//mailBox, err := mailServ.client.Select(mailBoxName, false)
+	//if err != nil {
+	//	return nil, "", err
+	//}
 	if mailBox.Messages == 0 {
-		return nil, "", errors.New(fmt.Sprintf("no message in mail box: %s", mailBoxName))
+		return nil, "", nil //errors.New(fmt.Sprintf("no message in mail box: %s", mailBoxName))
 	}
 
 	seqSet := new(imap.SeqSet)
@@ -172,7 +198,12 @@ func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBoxName string) 
 		return nil, "", err
 	}
 
-	cleanBody, err := cleanMessageBody(string(body))
+	cleanBody := ""
+	if mailServ.nameMailServ == "imap.gmail.com:993" {
+		cleanBody, err = cleanMessageBody(string(body))
+	} else {
+		cleanBody = string(body)
+	}
 	if err != nil {
 		return nil, "", err
 	}
@@ -181,7 +212,7 @@ func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBoxName string) 
 	if err != nil {
 		return nil, "", err
 	}
-
+	fmt.Println(string(newBody))
 	return m.Header, string(newBody), nil
 }
 func cleanMessageBody(messageBody string) (cleanBody string, err error) {
@@ -197,4 +228,20 @@ func cleanMessageBody(messageBody string) (cleanBody string, err error) {
 	}
 	lastIndexIndetificator = strings.Index(messageBody, indetificator)
 	return messageBody[base64Index+7 : lastIndexIndetificator], nil
+}
+
+func (mailServ *UserMailService) IsConstantlyUpdate() bool {
+	return mailServ.constantlyUpdate
+}
+func (mailServ *UserMailService) GetNameForMailService() string {
+	return mailServ.nameMailServ
+}
+func (mailServ *UserMailService) GetUsername() string {
+	return mailServ.username
+}
+func (mailServ *UserMailService) GetSwitchConstantlyUpdate() bool {
+	return mailServ.constantlyUpdate
+}
+func (mailServ *UserMailService) UpdateSwitchConstantlyUpdate(switcher bool) {
+	mailServ.constantlyUpdate = switcher
 }

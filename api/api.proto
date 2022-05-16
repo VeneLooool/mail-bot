@@ -1,0 +1,124 @@
+syntax = "proto3";
+
+package api;
+
+option go_package = "https://gitlab.ozon.dev/VeneLooool/homework-2";
+
+enum Status {
+  SUCCESS = 0;
+  FAIL = 1;
+  NOUPDATES = 2;
+  USERNOTFOUND = 3;
+  INCORRECTLOGINDATA = 4;
+  NOTENOUGHMESSAGES = 5;
+  MAILSERVICENOTFOUND = 6;
+}
+
+message mailMessages {
+  string mailServiceName = 1;
+  string userName = 2;
+  string messageHeader = 3;
+  string messageBody = 4;
+}
+message mailService {
+  string mailServiceNameInternalRep  = 1;
+  string mailServiceNameExternalRep = 2;
+  string userName = 3;
+}
+
+message CreateUserReq {
+  int32 id = 1;
+  int64 telegramID = 2;
+}
+message CreateUserResp {
+  int32 id = 1;
+  Status status = 2;
+  int64 telegramID = 3;
+}
+message CustomerSearchReq {
+  int32 id = 1;
+  int64 telegramID = 2;
+}
+message CustomerSearchResp {
+  int32 id = 1;
+  Status status = 2;
+  int64 telegramID = 3;
+}
+message DeleteUserReq {
+  int32 id = 1;
+  int64 telegramID = 2;
+}
+message DeleteUserResp {
+  int32 id = 1;
+  Status stratus = 2;
+  int64 telegramID = 3;
+}
+message ConstantlyUpdateReq {
+  int32 id = 1;
+  string mailServiceName = 2;
+  bool switch = 3;
+  int64 telegramID = 4;
+  string login = 5;
+}
+message ConstantlyUpdateResp {
+  int32 id = 1;
+  Status status = 2;
+  int64 telegramID = 3;
+}
+message AddNewMailServiceReq {
+  int32 id = 1;
+  string mailServiceName = 2;
+  string login = 3;
+  string password = 4;
+  int64 telegramID = 5;
+}
+message AddNewMailServiceResp {
+  int32 id = 1;
+  Status status = 2;
+  int64 telegramID = 3;
+}
+message GetLastMessageReq {
+  int32 id = 1;
+  int32 amountMessages = 2;
+  string mailServiceName = 3;
+  string userName = 4;
+  int64 telegramID = 5;
+}
+message GetLastMessageResp {
+  int32 id = 1;
+  Status status = 2;
+  repeated mailMessages messages = 3;
+  int64 telegramID = 4;
+}
+message CheckForUpdatesReq {
+  int32 id = 1;
+  int64 telegramID = 2;
+}
+message CheckForUpdatesResp {
+  int32 id = 1;
+  Status status = 2;
+  repeated mailMessages messages = 3;
+  int64 telegramID = 4;
+}
+
+message GetListAvailableMailServicesReq {
+  int32 id = 1;
+  int64 telegramID = 2;
+}
+message GetListAvailableMailServicesResp {
+  int32 id = 1;
+  Status status = 2;
+  repeated mailService AvailableMailServices = 3;
+  int64 telegramID = 4;
+}
+
+service MailServ {
+  rpc CreateUser (CreateUserReq) returns (CreateUserResp) {}
+  rpc CustomerSearch (CustomerSearchReq) returns (CustomerSearchResp) {}
+  rpc DeleteUser (DeleteUserReq) returns (DeleteUserResp) {}
+  rpc AddNewMailService (AddNewMailServiceReq) returns (AddNewMailServiceResp) {}
+  rpc ConstantlyUpdate (ConstantlyUpdateReq) returns (ConstantlyUpdateResp) {}
+  rpc CheckForUpdates (CheckForUpdatesReq) returns (CheckForUpdatesResp) {}
+  rpc GetLastMessages (GetLastMessageReq) returns (GetLastMessageResp) {}
+  rpc GetListAvailableMailServices (GetListAvailableMailServicesReq) returns (GetListAvailableMailServicesResp) {}
+}

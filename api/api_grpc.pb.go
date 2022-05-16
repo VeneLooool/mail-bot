@@ -29,6 +29,7 @@ type MailServClient interface {
 	ConstantlyUpdate(ctx context.Context, in *ConstantlyUpdateReq, opts ...grpc.CallOption) (*ConstantlyUpdateResp, error)
 	CheckForUpdates(ctx context.Context, in *CheckForUpdatesReq, opts ...grpc.CallOption) (*CheckForUpdatesResp, error)
 	GetLastMessages(ctx context.Context, in *GetLastMessageReq, opts ...grpc.CallOption) (*GetLastMessageResp, error)
+	GetListAvailableMailServices(ctx context.Context, in *GetListAvailableMailServicesReq, opts ...grpc.CallOption) (*GetListAvailableMailServicesResp, error)
 }
 
 type mailServClient struct {
@@ -102,6 +103,15 @@ func (c *mailServClient) GetLastMessages(ctx context.Context, in *GetLastMessage
 	return out, nil
 }
 
+func (c *mailServClient) GetListAvailableMailServices(ctx context.Context, in *GetListAvailableMailServicesReq, opts ...grpc.CallOption) (*GetListAvailableMailServicesResp, error) {
+	out := new(GetListAvailableMailServicesResp)
+	err := c.cc.Invoke(ctx, "/api.MailServ/GetListAvailableMailServices", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MailServServer is the server API for MailServ service.
 // All implementations must embed UnimplementedMailServServer
 // for forward compatibility
@@ -113,6 +123,7 @@ type MailServServer interface {
 	ConstantlyUpdate(context.Context, *ConstantlyUpdateReq) (*ConstantlyUpdateResp, error)
 	CheckForUpdates(context.Context, *CheckForUpdatesReq) (*CheckForUpdatesResp, error)
 	GetLastMessages(context.Context, *GetLastMessageReq) (*GetLastMessageResp, error)
+	GetListAvailableMailServices(context.Context, *GetListAvailableMailServicesReq) (*GetListAvailableMailServicesResp, error)
 	mustEmbedUnimplementedMailServServer()
 }
 
@@ -140,6 +151,9 @@ func (UnimplementedMailServServer) CheckForUpdates(context.Context, *CheckForUpd
 }
 func (UnimplementedMailServServer) GetLastMessages(context.Context, *GetLastMessageReq) (*GetLastMessageResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLastMessages not implemented")
+}
+func (UnimplementedMailServServer) GetListAvailableMailServices(context.Context, *GetListAvailableMailServicesReq) (*GetListAvailableMailServicesResp, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetListAvailableMailServices not implemented")
 }
 func (UnimplementedMailServServer) mustEmbedUnimplementedMailServServer() {}
 
@@ -280,6 +294,24 @@ func _MailServ_GetLastMessages_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MailServ_GetListAvailableMailServices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetListAvailableMailServicesReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServServer).GetListAvailableMailServices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.MailServ/GetListAvailableMailServices",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServServer).GetListAvailableMailServices(ctx, req.(*GetListAvailableMailServicesReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MailServ_ServiceDesc is the grpc.ServiceDesc for MailServ service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -314,6 +346,10 @@ var MailServ_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLastMessages",
 			Handler:    _MailServ_GetLastMessages_Handler,
+		},
+		{
+			MethodName: "GetListAvailableMailServices",
+			Handler:    _MailServ_GetListAvailableMailServices_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
