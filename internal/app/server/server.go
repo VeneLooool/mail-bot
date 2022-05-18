@@ -27,7 +27,7 @@ type User struct {
 }
 
 type Server struct {
-	users []User
+	users []*User
 	api2.UnimplementedMailServServer
 	availableMailServicesName []string
 }
@@ -54,7 +54,7 @@ func (serv *Server) CreateUser(ctx context.Context, req *api2.CreateUserReq) (re
 		}
 		return resp, nil
 	}
-	serv.users = append(serv.users, User{
+	serv.users = append(serv.users, &User{
 		telegramID:   req.GetTelegramID(),
 		mailServices: make([]*UserMailService, 0),
 		updates:      make([]*api2.MailMessages, 0),
@@ -117,7 +117,7 @@ func (serv *Server) AddNewMailService(ctx context.Context, req *api2.AddNewMailS
 			Status:     api2.Status_INCORRECTLOGINDATA,
 			TelegramID: req.GetTelegramID(),
 		}
-		return resp, err
+		return resp, nil
 	}
 	user.mailServices = append(user.mailServices, &newMailService)
 	resp = &api2.AddNewMailServiceResp{
@@ -324,7 +324,7 @@ func (serv *Server) GetListAvailableMailServices(ctx context.Context, req *api2.
 func (serv *Server) findUserInDB(telegramID int64) (user *User, isFound bool) {
 	for i := range serv.users {
 		if serv.users[i].telegramID == telegramID {
-			return &serv.users[i], true
+			return serv.users[i], true
 		}
 	}
 	return nil, false

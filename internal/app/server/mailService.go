@@ -1,16 +1,14 @@
 package app
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
+	enmime "github.com/jhillyerd/go.enmime"
 	homework_2 "gitlab.ozon.dev/VeneLooool/homework-2/api"
-	"io/ioutil"
 	"log"
 	"net/mail"
-	"strings"
 	"sync"
 	"time"
 )
@@ -69,6 +67,7 @@ func (mailServ *UserMailService) GetAllMailBoxes() (result []imap.MailboxInfo, e
 	return result, nil
 }
 func (mailServ *UserMailService) CheckForUpdate(user *User, mutexUpdate *sync.Mutex) error {
+	var waitGroup sync.WaitGroup
 	mailBox, err := mailServ.client.Select("INBOX", false)
 	if err != nil {
 		return err
@@ -77,15 +76,16 @@ func (mailServ *UserMailService) CheckForUpdate(user *User, mutexUpdate *sync.Mu
 	mailServ.client.Updates = mailServ.Data.Updates
 	stop := make(chan struct{})
 	done := make(chan error, 1)
+	waitGroup.Add(1)
 	go func() {
+		defer waitGroup.Done()
 		done <- mailServ.client.Idle(stop, nil)
 	}()
 	for {
 		select {
 		case <-mailServ.Data.Updates:
-			fmt.Println("New updated")
 			close(stop)
-			time.Sleep(time.Second * 5)
+			waitGroup.Wait()
 			_, body, err := mailServ.GetLastMessagesFromMailBox(mailBox)
 			if err != nil {
 				panic(err)
@@ -99,10 +99,12 @@ func (mailServ *UserMailService) CheckForUpdate(user *User, mutexUpdate *sync.Mu
 			mutexUpdate.Lock()
 			user.updates = append(user.updates, message)
 			mutexUpdate.Unlock()
-			time.Sleep(time.Second * 100)
+			time.Sleep(time.Second * 50)
 			stop = make(chan struct{})
 			done = make(chan error, 1)
+			waitGroup.Add(1)
 			go func() {
+				defer waitGroup.Done()
 				done <- mailServ.client.Idle(stop, nil)
 			}()
 		case constUpdate := <-mailServ.constUpdateChan:
@@ -113,6 +115,7 @@ func (mailServ *UserMailService) CheckForUpdate(user *User, mutexUpdate *sync.Mu
 			}
 		case err := <-done:
 			if err != nil {
+				panic(err)
 				return err
 			}
 		}
@@ -160,12 +163,9 @@ func (mailServ *UserMailService) LogoutFromService() error {
 
 //TODO должно быть n количество последних сообщений
 func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBox *imap.MailboxStatus) (header mail.Header, bodyMessage string, err error) {
-	//mailBox, err := mailServ.client.Select(mailBoxName, false)
-	//if err != nil {
-	//	return nil, "", err
-	//}
+
 	if mailBox.Messages == 0 {
-		return nil, "", nil //errors.New(fmt.Sprintf("no message in mail box: %s", mailBoxName))
+		return nil, "", nil
 	}
 
 	seqSet := new(imap.SeqSet)
@@ -176,9 +176,11 @@ func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBox *imap.Mailbo
 
 	message := make(chan *imap.Message, 1)
 	done := make(chan error, 1)
-	go func() {
-		done <- mailServ.client.Fetch(seqSet, items, message)
-	}()
+	//waitFor.Add(1)
+	//go func() {
+	//defer waitFor.Done()
+	done <- mailServ.client.Fetch(seqSet, items, message)
+	//}()
 	msg := <-message
 	r := msg.GetBody(section)
 
@@ -193,41 +195,10 @@ func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBox *imap.Mailbo
 		return nil, "", err
 	}
 
-	body, err := ioutil.ReadAll(m.Body)
-	if err != nil {
-		return nil, "", err
-	}
+	mime, _ := enmime.ParseMIMEBody(&mail.Message{Header: m.Header, Body: m.Body})
 
-	cleanBody := ""
-	if mailServ.nameMailServ == "imap.gmail.com:993" {
-		cleanBody, err = cleanMessageBody(string(body))
-	} else {
-		cleanBody = string(body)
-	}
-	if err != nil {
-		return nil, "", err
-	}
-
-	newBody, err := base64.StdEncoding.DecodeString(cleanBody)
-	if err != nil {
-		return nil, "", err
-	}
-	fmt.Println(string(newBody))
-	return m.Header, string(newBody), nil
-}
-func cleanMessageBody(messageBody string) (cleanBody string, err error) {
-	lastIndexIndetificator := strings.Index(messageBody, "\n")
-	if lastIndexIndetificator <= 0 {
-		return "", errors.New("no indetificator was found")
-	}
-	indetificator := messageBody[:lastIndexIndetificator]
-	messageBody = messageBody[lastIndexIndetificator+1:]
-	base64Index := strings.Index(messageBody, "base64")
-	if base64Index <= 0 {
-		return messageBody, nil
-	}
-	lastIndexIndetificator = strings.Index(messageBody, indetificator)
-	return messageBody[base64Index+7 : lastIndexIndetificator], nil
+	log.Println(mime.Text)
+	return m.Header, mime.Text, nil
 }
 
 func (mailServ *UserMailService) IsConstantlyUpdate() bool {
