@@ -1,4 +1,4 @@
-package app
+package server
 
 import (
 	"fmt"
@@ -178,7 +178,6 @@ func (serv *Server) ConstantlyUpdate(ctx context.Context, req *api2.ConstantlyUp
 
 }
 
-//rpc CheckForUpdates (CheckForUpdatesReq) returns (CheckForUpdatesResp) {}
 func (serv *Server) CheckForUpdates(ctx context.Context, req *api2.CheckForUpdatesReq) (resp *api2.CheckForUpdatesResp, err error) {
 	user, isFound := serv.findUserInDB(req.GetTelegramID())
 	if !isFound {
@@ -332,6 +331,9 @@ func (serv *Server) findUserInDB(telegramID int64) (user *User, isFound bool) {
 
 //TODO возможно ссылка не правильная будет(проверить)
 func (user *User) findAllMailServices(mailServiceName string) (pointer []*UserMailService, isFound bool) {
+	if user == nil {
+		return nil, false
+	}
 	pointer = make([]*UserMailService, 0)
 	for _, mailServ := range user.mailServices {
 		if mailServ.nameMailServ == mailServiceName {
@@ -346,6 +348,9 @@ func (user *User) findAllMailServices(mailServiceName string) (pointer []*UserMa
 }
 
 func (user *User) findMailService(mailServiceName, username string) (pointer *UserMailService, isFound bool) {
+	if user == nil {
+		return nil, false
+	}
 	allPointers, ok := user.findAllMailServices(mailServiceName)
 	if !ok {
 		return nil, false
@@ -359,6 +364,9 @@ func (user *User) findMailService(mailServiceName, username string) (pointer *Us
 }
 
 func (serv *Server) AddAvailableServices(nameServices []string) {
+	if serv == nil {
+		return
+	}
 	for _, name := range nameServices {
 		serv.availableMailServicesName = append(serv.availableMailServicesName, name)
 	}

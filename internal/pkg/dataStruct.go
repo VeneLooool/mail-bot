@@ -1,8 +1,10 @@
 package pkg
 
-import "gitlab.ozon.dev/VeneLooool/homework-2/internal/app"
+import (
+	"gitlab.ozon.dev/VeneLooool/homework-2/internal/app/server"
+)
 
 type User struct {
-	mailServices []app.UserMailService
+	mailServices []server.UserMailService
 	telegramId   string
 }

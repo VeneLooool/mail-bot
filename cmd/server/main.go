@@ -3,14 +3,14 @@ package main
 import (
 	"fmt"
 	api2 "gitlab.ozon.dev/VeneLooool/homework-2/api"
-	"gitlab.ozon.dev/VeneLooool/homework-2/internal/app"
+	"gitlab.ozon.dev/VeneLooool/homework-2/internal/app/server"
 	"google.golang.org/grpc"
 	"net"
 	"time"
 )
 
 func main() {
-	newServer := app.Server{}
+	newServer := server.Server{}
 	newServer.AddAvailableServices([]string{"imap.gmail.com:993", "imap.yandex.ru:993"})
 	fmt.Println("Server has started")
 	listener, err := net.Listen("tcp", "localhost:8080")
@@ -18,7 +18,7 @@ func main() {
 		panic(err)
 	}
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(app.ValidatorInterceptor),
+		grpc.UnaryInterceptor(server.ValidatorInterceptor),
 	}
 	grpcServer := grpc.NewServer(opts...)
 	api2.RegisterMailServServer(grpcServer, &newServer)
