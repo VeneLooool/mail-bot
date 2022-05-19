@@ -1,0 +1,11 @@
+server:
+  port: "8080"
+  address: "localhost"
+  network: "tcp"
+telegramBot:
+  token: "5323621344:AAFiygB5y1qHek82eLEO9pi-iRzNJHB1-aQ"
+availableServices:
+  mail_names: ["imap.gmail.com:993", "imap.yandex.ru:993"]
+httpServer:
+  network: "tcp"
+  address: "8081"

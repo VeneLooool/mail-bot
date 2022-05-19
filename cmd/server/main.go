@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	api2 "gitlab.ozon.dev/VeneLooool/homework-2/api"
+	"gitlab.ozon.dev/VeneLooool/homework-2/config"
 	"gitlab.ozon.dev/VeneLooool/homework-2/internal/app/server"
 	"google.golang.org/grpc"
 	"log"
@@ -13,39 +14,21 @@ import (
 )
 
 func runRest() {
-	/*conn, err := grpc.DialContext(
-		context.Background(),
-		"0.0.0.0:8080",
-		grpc.WithBlock(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	configuration, err := config.GetConfig()
 	if err != nil {
-		log.Fatalln("Failed to dial server:", err)
+		log.Fatal(err)
 	}
 
-	gwmux := runtime.NewServeMux()
-	// Register Greeter
-	err = api2.RegisterMailServHandler(context.Background(), gwmux, conn)
-	if err != nil {
-		log.Fatalln("Failed to register gateway:", err)
-	}
-
-	gwServer := &http.Server{
-		Addr:    ":8090",
-		Handler: gwmux,
-	}
-
-	log.Println("Serving gRPC-Gateway on http://0.0.0.0:8090")
-	log.Fatalln(gwServer.ListenAndServe())*/
 	mux := runtime.NewServeMux()
-	err := api2.RegisterMailServHandlerFromEndpoint(context.Background(), mux, "localhost:8080", []grpc.DialOption{grpc.WithInsecure()})
+	err = api2.RegisterMailServHandlerFromEndpoint(context.Background(), mux, "localhost:8080", []grpc.DialOption{grpc.WithInsecure()})
 	if err != nil {
 		log.Fatal(err)
 	}
 	server := http.Server{
 		Handler: mux,
 	}
-	l, err := net.Listen("tcp", ":8081")
+
+	l, err := net.Listen(configuration.GetHttpServNetwork(), configuration.GetHttpServAddress())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,52 +39,29 @@ func runRest() {
 }
 
 func main() {
+
+	configuration, err := config.GetConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	newServer := server.Server{}
-	newServer.AddAvailableServices([]string{"imap.gmail.com:993", "imap.yandex.ru:993"})
+
+	newServer.AddAvailableServices(configuration.GetAvailableMailServices())
+
 	fmt.Println("Server has started")
-	listener, err := net.Listen("tcp", "localhost:8080")
+
+	listener, err := net.Listen(configuration.GetServerNetwork(), configuration.GetServerAddressAndPort())
 	if err != nil {
 		panic(err)
 	}
+
 	opts := []grpc.ServerOption{
 		grpc.UnaryInterceptor(server.ValidatorInterceptor),
 	}
 	grpcServer := grpc.NewServer(opts...)
 	api2.RegisterMailServServer(grpcServer, &newServer)
-	//err = grpcServer.Serve(listener)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//for {
-	//	time.Sleep(time.Millisecond * 100)
-	//}
-	//go func() {
+
 	go runRest()
 	log.Fatalln(grpcServer.Serve(listener))
-	//}()
-	/*
-		conn, err := grpc.DialContext(
-			context.Background(),
-			"0.0.0.0:8080",
-			grpc.WithBlock(),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			log.Fatalln("Failed to dial server:", err)
-		}
-
-		gwmux := runtime.NewServeMux()
-		// Register Greeter
-		err = api2.RegisterMailServHandler(context.Background(), gwmux, conn)
-		if err != nil {
-			log.Fatalln("Failed to register gateway:", err)
-		}
-
-		gwServer := &http.Server{
-			Addr:    ":8090",
-			Handler: gwmux,
-		}
-
-		log.Println("Serving gRPC-Gateway on http://0.0.0.0:8090")
-		log.Fatalln(gwServer.ListenAndServe())*/
 }

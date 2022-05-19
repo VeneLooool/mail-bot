@@ -11,7 +11,6 @@ require (
 )
 
 require (
-
 	github.com/cention-sany/utf7 v0.0.0-20170124080048-26cad61bd60a // indirect
 	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21 // indirect
 	github.com/gogs/chardet v0.0.0-20191104214054-4b6791f73a28 // indirect
@@ -35,5 +34,6 @@ require (
 	google.golang.org/genproto v0.0.0-20220317150908-0efb43f6373e // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.2.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20220512140231-539c8e751b99 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )

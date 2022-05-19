@@ -1,0 +1,6 @@
+POST http://localhost:8081/v1/CreateUser
+Content-Type: application/json
+
+{}
+
+###

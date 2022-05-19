@@ -6,6 +6,7 @@ import (
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	homework_2 "gitlab.ozon.dev/VeneLooool/homework-2/api"
+	"gitlab.ozon.dev/VeneLooool/homework-2/config"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"log"
@@ -53,34 +54,42 @@ type TelegramBot struct {
 	availableMailServices []string
 }
 
-func CreateTelegramBot(target, token string, timeout int) (telegramBot TelegramBot, err error) {
-	if target == "" || token == "" || timeout == 0 {
-		return TelegramBot{}, errors.New("incorrect input data")
+func CreateTelegramBot(timeout int) (telegramBot TelegramBot, err error) {
+	configuration, err := config.GetConfig()
+	if err != nil {
+		return TelegramBot{}, err
 	}
-	telegramBot.availableMailServices = []string{"imap.gmail.com:993", "imap.yandex.ru:993"}
-	telegramBot.token = token
+
+	telegramBot.availableMailServices = configuration.GetAvailableMailServices() //[]string{"imap.gmail.com:993", "imap.yandex.ru:993"}
+	telegramBot.token = configuration.GetTelegramToken()
+
 	telegramBot.users = make([]*TelegramUser, 0)
 	telegramBot.ctx = context.Background()
+
 	telegramBot.ctx = metadata.AppendToOutgoingContext(telegramBot.ctx,
 		"sender", "testClient",
 		"when", time.Now().Format(time.RFC3339),
 		"sender", "route256",
 	)
-	telegramBot.bot, err = tgbotapi.NewBotAPI(token)
+
+	telegramBot.bot, err = tgbotapi.NewBotAPI(telegramBot.token)
 	if err != nil {
 		return TelegramBot{}, err
 	}
+
 	telegramBot.updatesConfig = tgbotapi.NewUpdate(0)
 	telegramBot.updatesConfig.Timeout = timeout
+
 	telegramBot.updates, err = telegramBot.bot.GetUpdatesChan(telegramBot.updatesConfig)
 	if err != nil {
 		return TelegramBot{}, err
 	}
 
-	telegramBot.connectionToServer, err = grpc.Dial(target, grpc.WithInsecure())
+	telegramBot.connectionToServer, err = grpc.Dial(configuration.GetServerAddressAndPort(), grpc.WithInsecure())
 	if err != nil {
 		return TelegramBot{}, nil
 	}
+
 	telegramBot.client = homework_2.NewMailServClient(telegramBot.connectionToServer)
 	return telegramBot, nil
 }
