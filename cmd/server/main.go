@@ -20,7 +20,8 @@ func runRest() {
 	}
 
 	mux := runtime.NewServeMux()
-	err = api2.RegisterMailServHandlerFromEndpoint(context.Background(), mux, "localhost:8080", []grpc.DialOption{grpc.WithInsecure()})
+	//"localhost:8080"
+	err = api2.RegisterMailServHandlerFromEndpoint(context.Background(), mux, configuration.GetServerAddressAndPort(), []grpc.DialOption{grpc.WithInsecure()})
 	if err != nil {
 		log.Fatal(err)
 	}
