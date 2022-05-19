@@ -3,6 +3,7 @@ syntax = "proto3";
 package api;
 
 option go_package = "https://gitlab.ozon.dev/VeneLooool/homework-2";
+import "google/api/annotations.proto";
 
 enum Status {
   SUCCESS = 0;
@@ -113,12 +114,51 @@ message GetListAvailableMailServicesResp {
 }
 
 service MailServ {
-  rpc CreateUser (CreateUserReq) returns (CreateUserResp) {}
-  rpc CustomerSearch (CustomerSearchReq) returns (CustomerSearchResp) {}
-  rpc DeleteUser (DeleteUserReq) returns (DeleteUserResp) {}
-  rpc AddNewMailService (AddNewMailServiceReq) returns (AddNewMailServiceResp) {}
-  rpc ConstantlyUpdate (ConstantlyUpdateReq) returns (ConstantlyUpdateResp) {}
-  rpc CheckForUpdates (CheckForUpdatesReq) returns (CheckForUpdatesResp) {}
-  rpc GetLastMessages (GetLastMessageReq) returns (GetLastMessageResp) {}
-  rpc GetListAvailableMailServices (GetListAvailableMailServicesReq) returns (GetListAvailableMailServicesResp) {}
+  rpc CreateUser (CreateUserReq) returns (CreateUserResp) {
+    option (google.api.http) = {
+      post: "/v1/CreateUser"
+      body: "*"
+    };
+  }
+  rpc CustomerSearch (CustomerSearchReq) returns (CustomerSearchResp) {
+    option (google.api.http) = {
+      post: "/v1/CustomSearch"
+      body: "*"
+    };
+  }
+  rpc DeleteUser (DeleteUserReq) returns (DeleteUserResp) {
+    option (google.api.http) = {
+      post: "/v1/DeleteUser"
+      body: "*"
+    };
+  }
+  rpc AddNewMailService (AddNewMailServiceReq) returns (AddNewMailServiceResp) {
+    option (google.api.http) = {
+      post: "/v1/AddNewMailService"
+    };
+  }
+  rpc ConstantlyUpdate (ConstantlyUpdateReq) returns (ConstantlyUpdateResp) {
+    option (google.api.http) = {
+      post: "/v1/ConstantlyUpdate"
+      body: "*"
+    };
+  }
+  rpc CheckForUpdates (CheckForUpdatesReq) returns (CheckForUpdatesResp) {
+    option (google.api.http) = {
+      post: "/v1/CheckForUpdates"
+      body: "*"
+    };
+  }
+  rpc GetLastMessages (GetLastMessageReq) returns (GetLastMessageResp) {
+    option (google.api.http) = {
+      post: "/v1/GetLastMessages"
+      body: "*"
+    };
+  }
+  rpc GetListAvailableMailServices (GetListAvailableMailServicesReq) returns (GetListAvailableMailServicesResp) {
+    option (google.api.http) = {
+      post: "/v1/GetListAvailableMailServices"
+      body: "*"
+    };
+  }
 }
