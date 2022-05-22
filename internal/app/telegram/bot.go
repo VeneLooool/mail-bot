@@ -85,7 +85,7 @@ func CreateTelegramBot(timeout int) (telegramBot TelegramBot, err error) {
 		return TelegramBot{}, err
 	}
 
-	telegramBot.connectionToServer, err = grpc.Dial(configuration.GetServerAddressAndPort(), grpc.WithInsecure())
+	telegramBot.connectionToServer, err = grpc.Dial("localhost"+configuration.GetServerAddressAndPort(), grpc.WithInsecure())
 	if err != nil {
 		return TelegramBot{}, nil
 	}

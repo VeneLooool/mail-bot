@@ -1,6 +1,6 @@
 server:
   port: "8080"
-  address: "localhost"
+  address: ""
   network: "tcp"
 telegramBot:
   token: "5323621344:AAFiygB5y1qHek82eLEO9pi-iRzNJHB1-aQ"
