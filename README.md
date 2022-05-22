@@ -1,3 +1,8 @@
+To start server 
+input "docker build ."
+input "docker run -p 8080:8080 -p 8081:8081 <image id>"
+
+
 # homework-2
 Subject: Почтовый бот
 Concept: Бот, позволяет агрегировать информацию с нескольких почтовых ящиков о новых сообщениях в почте.
