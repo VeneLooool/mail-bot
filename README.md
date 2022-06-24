@@ -1,22 +1,15 @@
-To start server 
-input "docker build ."
-input "docker run -p 8080:8080 -p 8081:8081 <image id>"
+# mail-bot
 
 
-# homework-2
-Subject: Почтовый бот
-Concept: Бот, позволяет агрегировать информацию с нескольких почтовых ящиков о новых сообщениях в почте.
-functional: 
-1. Подключение ящиков по IMAP
-2. Отключение ящиков
-3. Получение свежих сообщений в режиме онлайн (пулинг ящиков)
-4. Подключение нескольких ящиков для одного пользователя
-5. Список будет дополняться
+This is a pet project. The project was made to study the interaction of services using GRPC and generated REST handles.
 
-Примерно, как все будет устроено:
+Services diagram: [board](https://miro.com/app/board/uXjVOOF970c=/?share_link_id=953445995628) in miro.
+  
+  
+To start server: 
+1. input "docker build ."
+2. input "docker run -p 8080:8080 -p 8081:8081 <image id>"  
+  
+  
 
-Сервер будет подключаться к почтовым сервисам, получать информацию от них. Хранить данные пользователей в BD.
-У севера будет api, к которому можно будет получать доступ по HTTP интерфейсам. Бот для telegram будет подключаться к северу, и получать от него информацию для пользователей. Бот будет уже напрямую взаимодействовать с telegram api.
-
-https://drive.google.com/file/d/1ujfcZw57ZAGjX9LXgWXSxEoYYhfXf_b6/view?usp=sharing (ссылка на диаграмму)
-
+![Mail parser](https://user-images.githubusercontent.com/54485018/175615477-685c9403-744d-4193-8991-67d2530ac6cf.jpg)
