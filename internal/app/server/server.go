@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/emersion/go-imap/client"
 	api2 "gitlab.ozon.dev/VeneLooool/homework-2/api"
+	"gitlab.ozon.dev/VeneLooool/homework-2/config"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -21,7 +22,7 @@ type Message struct {
 
 type User struct {
 	telegramID   int64
-	mailServices []*UserMailService
+	mailServices []*Service
 	updates      []*api2.MailMessages
 	updatesMutex sync.Mutex
 }
@@ -29,11 +30,16 @@ type User struct {
 type Server struct {
 	users []*User
 	api2.UnimplementedMailServServer
-	availableMailServicesName []string
+	mailServices []string
 }
 
-//TODO почти везде не проверяется на то что установленно ли connection с сервисом для юзера(исправить)
-func ValidatorInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func NewServer(config config.Config) *Server {
+	return &Server{
+		mailServices: config.GetMailServices(),
+	}
+}
+
+func Interceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	if v, ok := req.(interface{ GetId() int32 }); ok {
 		if v.GetId() < 0 {
 			return nil, status.Error(codes.InvalidArgument, "Bad Id")
@@ -41,7 +47,6 @@ func ValidatorInterceptor(ctx context.Context, req interface{}, info *grpc.Unary
 	} else {
 		return nil, status.Error(codes.InvalidArgument, "Bad Request")
 	}
-	fmt.Println("Had worked interceptor!")
 	return handler(ctx, req)
 }
 
@@ -56,7 +61,7 @@ func (serv *Server) CreateUser(ctx context.Context, req *api2.CreateUserReq) (re
 	}
 	serv.users = append(serv.users, &User{
 		telegramID:   req.GetTelegramID(),
-		mailServices: make([]*UserMailService, 0),
+		mailServices: make([]*Service, 0),
 		updates:      make([]*api2.MailMessages, 0),
 	})
 	fmt.Printf("Create user where tgID:%d\n", req.GetTelegramID())
@@ -110,8 +115,8 @@ func (serv *Server) AddNewMailService(ctx context.Context, req *api2.AddNewMailS
 			return resp, nil
 		}
 	}
-	newMailService := BuildUpUserMailService(req.GetMailServiceName(), req.GetLogin(), req.GetPassword())
-	if err := newMailService.ConnectToService(); err != nil {
+	newMailService := NewUserService(req.GetMailServiceName(), req.GetLogin(), req.GetPassword())
+	if err := newMailService.Connect(); err != nil {
 		resp = &api2.AddNewMailServiceResp{
 			Id:         req.GetId(),
 			Status:     api2.Status_INCORRECTLOGINDATA,
@@ -149,7 +154,7 @@ func (serv *Server) ConstantlyUpdate(ctx context.Context, req *api2.ConstantlyUp
 		return resp, nil
 	}
 
-	if req.GetSwitch() == mailService.GetSwitchConstantlyUpdate() {
+	if req.GetSwitch() == mailService.GetOnlineUpdateSwitch() {
 		resp = &api2.ConstantlyUpdateResp{
 			Id:         req.GetId(),
 			Status:     api2.Status_SUCCESS,
@@ -157,15 +162,15 @@ func (serv *Server) ConstantlyUpdate(ctx context.Context, req *api2.ConstantlyUp
 		}
 		return resp, nil
 	} else {
-		if req.GetSwitch() && !mailService.GetSwitchConstantlyUpdate() {
-			mailService.constUpdateChan = make(chan bool, 10)
-			mailService.Data.Updates = make(chan client.Update)
-			mailService.UpdateSwitchConstantlyUpdate(true)
+		if req.GetSwitch() && !mailService.GetOnlineUpdateSwitch() {
+			mailService.onlineUpdatesChan = make(chan bool, 10)
+			mailService.Email.Updates = make(chan client.Update)
+			mailService.SetOnlineUpdateSwitch(true)
 			go mailService.CheckForUpdate(user, &user.updatesMutex)
 		} else {
-			mailService.constUpdateChan <- false
-			mailService.constantlyUpdate = false
-			close(mailService.constUpdateChan)
+			mailService.onlineUpdatesChan <- false
+			mailService.SetOnlineUpdateSwitch(false)
+			close(mailService.onlineUpdatesChan)
 		}
 	}
 	resp = &api2.ConstantlyUpdateResp{
@@ -239,7 +244,7 @@ func (serv *Server) GetLastMessages(ctx context.Context, req *api2.GetLastMessag
 		}
 		return resp, nil
 	}
-	if mailService.GetSwitchConstantlyUpdate() {
+	if mailService.GetOnlineUpdateSwitch() {
 		resp = &api2.GetLastMessageResp{
 			Id:         req.GetId(),
 			Status:     api2.Status_FAIL,
@@ -252,7 +257,7 @@ func (serv *Server) GetLastMessages(ctx context.Context, req *api2.GetLastMessag
 	if err != nil {
 		return nil, err
 	}
-	_, messBody, err := mailService.GetLastMessagesFromMailBox(mailBox)
+	_, messBody, err := mailService.GetLastMessages(mailBox)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +291,7 @@ func (serv *Server) GetListAvailableMailServices(ctx context.Context, req *api2.
 	}
 	isFundAny := false
 	availableMailServicesForUser := make([]*api2.MailService, 0)
-	for _, name := range serv.availableMailServicesName {
+	for _, name := range serv.mailServices {
 		mailServices, isFound := user.findAllMailServices(name)
 		if isFound {
 			isFundAny = true
@@ -329,14 +334,13 @@ func (serv *Server) findUserInDB(telegramID int64) (user *User, isFound bool) {
 	return nil, false
 }
 
-//TODO возможно ссылка не правильная будет(проверить)
-func (user *User) findAllMailServices(mailServiceName string) (pointer []*UserMailService, isFound bool) {
+func (user *User) findAllMailServices(name string) (pointer []*Service, isFound bool) {
 	if user == nil {
 		return nil, false
 	}
-	pointer = make([]*UserMailService, 0)
+	pointer = make([]*Service, 0)
 	for _, mailServ := range user.mailServices {
-		if mailServ.nameMailServ == mailServiceName {
+		if mailServ.name == name {
 			pointer = append(pointer, mailServ)
 			isFound = true
 		}
@@ -347,7 +351,7 @@ func (user *User) findAllMailServices(mailServiceName string) (pointer []*UserMa
 	return nil, isFound
 }
 
-func (user *User) findMailService(mailServiceName, username string) (pointer *UserMailService, isFound bool) {
+func (user *User) findMailService(mailServiceName, username string) (pointer *Service, isFound bool) {
 	if user == nil {
 		return nil, false
 	}
@@ -361,13 +365,4 @@ func (user *User) findMailService(mailServiceName, username string) (pointer *Us
 		}
 	}
 	return nil, false
-}
-
-func (serv *Server) AddAvailableServices(nameServices []string) {
-	if serv == nil {
-		return
-	}
-	for _, name := range nameServices {
-		serv.availableMailServicesName = append(serv.availableMailServicesName, name)
-	}
 }

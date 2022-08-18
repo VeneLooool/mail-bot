@@ -5,15 +5,15 @@ import (
 )
 
 func main() {
-	tgBot, err := telegram.CreateTelegramBot(60)
+	telegram, err := telegram.NewTelegramBot(60)
 	if err != nil {
 		panic(err)
 	}
 
-	defer tgBot.CloseConnectionWithServer()
-	go tgBot.HandlerUpdatesForUser()
-	err = tgBot.StartTelegramBot()
-	if err != nil {
+	defer telegram.CloseConnectionWithServer()
+	go telegram.HandlerUpdatesForUser()
+
+	if err = telegram.StartTelegramBot(); err != nil {
 		panic(err)
 	}
 }

@@ -2,113 +2,134 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
 	enmime "github.com/jhillyerd/go.enmime"
-	homework_2 "gitlab.ozon.dev/VeneLooool/homework-2/api"
-	"log"
+	api "gitlab.ozon.dev/VeneLooool/homework-2/api"
 	"net/mail"
 	"sync"
 	"time"
 )
 
-type UserMailService struct {
-	nameMailServ     string
-	password         string
-	username         string
-	isLogin          bool
-	constantlyUpdate bool
-	constUpdateChan  chan bool
-	client           *client.Client
-	Data             ThisData
+type Service struct {
+	name              string
+	password          string
+	username          string
+	isLogin           bool
+	onlineUpdates     bool
+	onlineUpdatesChan chan bool
+	client            *client.Client
+	Email             email
 }
-type ThisData struct {
-	mailboxes chan *imap.MailboxInfo
+type email struct {
+	boxes     chan *imap.MailboxInfo
 	Updates   chan client.Update
 	NewUpdate chan bool
 }
 
-func BuildUpUserMailService(nameMailServ, username, password string) UserMailService {
-	var mailService UserMailService
-	mailService.nameMailServ = nameMailServ
-	mailService.password = password
-	mailService.username = username
-	return mailService
+func NewUserService(name, username, password string) Service {
+	return Service{
+		name:     name,
+		password: password,
+		username: username,
+	}
 }
 
-//TODO поправить возможно убрать data
-func (mailServ *UserMailService) RefreshMailBoxes() error {
-	//TODO тут должно стоять не 10, а количетсво mailBoxes, хз как получить их
-	if mailServ.Data.mailboxes == nil {
-		mailServ.Data.mailboxes = make(chan *imap.MailboxInfo, 10)
+func (service *Service) Connect() (err error) {
+	if service.client, err = client.DialTLS(service.name, nil); err != nil {
+		return err
+	}
+	if err = service.Login(); err != nil {
+		return err
+	}
+	return nil
+}
+func (service *Service) Login() error {
+	if service.client == nil {
+		return errors.New("user isn't connected to the server")
+	}
+	if err := service.client.Login(service.username, service.password); err != nil {
+		return err
+	}
+	service.isLogin = true
+	return nil
+}
+func (service *Service) Logout() error {
+	if err := service.client.Logout(); err != nil {
+		return err
+	}
+	service.client = nil
+	service.isLogin = false
+	return nil
+}
+
+func (service *Service) RefreshMail() error {
+	if service.Email.boxes == nil {
+		service.Email.boxes = make(chan *imap.MailboxInfo, 10)
 	}
 	done := make(chan error, 1)
 	go func() {
-		done <- mailServ.client.List("", "*", mailServ.Data.mailboxes)
+		done <- service.client.List("", "*", service.Email.boxes)
 	}()
 	if err := <-done; err != nil {
 		return err
 	}
 	return nil
 }
-func (mailServ *UserMailService) GetAllMailBoxes() (result []imap.MailboxInfo, err error) {
-	if mailServ.Data.mailboxes == nil {
-		if err = mailServ.RefreshMailBoxes(); err != nil {
+func (service *Service) GetMailBoxes() (result []imap.MailboxInfo, err error) {
+	if service.Email.boxes == nil {
+		if err = service.RefreshMail(); err != nil {
 			return nil, err
 		}
-
 	}
 
-	for value := range mailServ.Data.mailboxes {
+	for value := range service.Email.boxes {
 		result = append(result, *value)
 	}
-
 	return result, nil
 }
-func (mailServ *UserMailService) CheckForUpdate(user *User, mutexUpdate *sync.Mutex) error {
+func (service *Service) CheckForUpdate(user *User, mutexUpdate *sync.Mutex) error {
 	var waitGroup sync.WaitGroup
-	mailBox, err := mailServ.client.Select("INBOX", false)
+
+	mailBox, err := service.client.Select("INBOX", false)
 	if err != nil {
 		return err
 	}
 
-	mailServ.client.Updates = mailServ.Data.Updates
+	service.client.Updates = service.Email.Updates
 	stop := make(chan struct{})
 	done := make(chan error, 1)
 	waitGroup.Add(1)
 	go func() {
 		defer waitGroup.Done()
-		done <- mailServ.client.Idle(stop, nil)
+		done <- service.client.Idle(stop, nil)
 	}()
 	for {
 		select {
-		case <-mailServ.Data.Updates:
+		case <-service.Email.Updates:
 			close(stop)
 			waitGroup.Wait()
-			_, body, err := mailServ.GetLastMessagesFromMailBox(mailBox)
+
+			_, body, err := service.GetLastMessages(mailBox)
 			if err != nil {
 				panic(err)
 			}
-			message := &homework_2.MailMessages{
-				MailServiceName: mailServ.nameMailServ,
-				UserName:        mailServ.username,
-				MessageHeader:   "",
-				MessageBody:     body,
-			}
+
+			message := service.NewMessage("", body)
 			mutexUpdate.Lock()
 			user.updates = append(user.updates, message)
 			mutexUpdate.Unlock()
+
 			time.Sleep(time.Second * 50)
 			stop = make(chan struct{})
 			done = make(chan error, 1)
 			waitGroup.Add(1)
+
 			go func() {
 				defer waitGroup.Done()
-				done <- mailServ.client.Idle(stop, nil)
+				done <- service.client.Idle(stop, nil)
 			}()
-		case constUpdate := <-mailServ.constUpdateChan:
-			fmt.Println("Я закрылся")
+		case constUpdate := <-service.onlineUpdatesChan:
 			if !constUpdate {
 				close(stop)
 				return nil
@@ -122,48 +143,7 @@ func (mailServ *UserMailService) CheckForUpdate(user *User, mutexUpdate *sync.Mu
 	}
 }
 
-func (mailServ *UserMailService) ConnectToService() error {
-	err := error(nil)
-
-	mailServ.client, err = client.DialTLS(mailServ.nameMailServ, nil)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("Succecfule connected to server for user: %s\n", mailServ.username)
-
-	if err = mailServ.LoginToService(); err != nil {
-		return err
-	}
-
-	log.Printf("Succecfule login to server for user: %s\n", mailServ.username)
-
-	return nil
-}
-func (mailServ *UserMailService) LoginToService() error {
-	if mailServ.client == nil {
-		return errors.New("user isn't connected to the server")
-	}
-	if err := mailServ.client.Login(mailServ.username, mailServ.password); err != nil {
-		return err
-	}
-	mailServ.isLogin = true
-	return nil
-}
-func (mailServ *UserMailService) LogoutFromService() error {
-	err := mailServ.client.Logout()
-	if err != nil {
-		return err
-	}
-	mailServ.client = nil
-	mailServ.isLogin = false
-	log.Printf("Seccecfule logout for user: %s\n", mailServ.username)
-	return nil
-}
-
-//TODO должно быть n количество последних сообщений
-func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBox *imap.MailboxStatus) (header mail.Header, bodyMessage string, err error) {
-
+func (service *Service) GetLastMessages(mailBox *imap.MailboxStatus) (header mail.Header, bodyMessage string, err error) {
 	if mailBox.Messages == 0 {
 		return nil, "", nil
 	}
@@ -176,11 +156,8 @@ func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBox *imap.Mailbo
 
 	message := make(chan *imap.Message, 1)
 	done := make(chan error, 1)
-	//waitFor.Add(1)
-	//go func() {
-	//defer waitFor.Done()
-	done <- mailServ.client.Fetch(seqSet, items, message)
-	//}()
+	done <- service.client.Fetch(seqSet, items, message)
+
 	msg := <-message
 	r := msg.GetBody(section)
 
@@ -190,29 +167,34 @@ func (mailServ *UserMailService) GetLastMessagesFromMailBox(mailBox *imap.Mailbo
 	if err = <-done; err != nil {
 		return nil, "", err
 	}
+
 	m, err := mail.ReadMessage(r)
 	if err != nil {
 		return nil, "", err
 	}
-
 	mime, _ := enmime.ParseMIMEBody(&mail.Message{Header: m.Header, Body: m.Body})
 
-	log.Println(mime.Text)
 	return m.Header, mime.Text, nil
 }
 
-func (mailServ *UserMailService) IsConstantlyUpdate() bool {
-	return mailServ.constantlyUpdate
+func (service *Service) NewMessage(header string, body string) *api.MailMessages {
+	return &api.MailMessages{
+		MailServiceName: service.name,
+		UserName:        service.username,
+		MessageHeader:   header,
+		MessageBody:     body,
+	}
 }
-func (mailServ *UserMailService) GetNameForMailService() string {
-	return mailServ.nameMailServ
+
+func (service *Service) GetNameForMailService() string {
+	return service.name
 }
-func (mailServ *UserMailService) GetUsername() string {
-	return mailServ.username
+func (service *Service) GetUsername() string {
+	return service.username
 }
-func (mailServ *UserMailService) GetSwitchConstantlyUpdate() bool {
-	return mailServ.constantlyUpdate
+func (service *Service) GetOnlineUpdateSwitch() bool {
+	return service.onlineUpdates
 }
-func (mailServ *UserMailService) UpdateSwitchConstantlyUpdate(switcher bool) {
-	mailServ.constantlyUpdate = switcher
+func (service *Service) SetOnlineUpdateSwitch(switcher bool) {
+	service.onlineUpdates = switcher
 }

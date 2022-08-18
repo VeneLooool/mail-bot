@@ -54,13 +54,13 @@ type TelegramBot struct {
 	availableMailServices []string
 }
 
-func CreateTelegramBot(timeout int) (telegramBot TelegramBot, err error) {
+func NewTelegramBot(timeout int) (telegramBot TelegramBot, err error) {
 	configuration, err := config.GetConfig()
 	if err != nil {
 		return TelegramBot{}, err
 	}
 
-	telegramBot.availableMailServices = configuration.GetAvailableMailServices() //[]string{"imap.gmail.com:993", "imap.yandex.ru:993"}
+	telegramBot.availableMailServices = configuration.GetMailServices() //[]string{"imap.gmail.com:993", "imap.yandex.ru:993"}
 	telegramBot.token = configuration.GetTelegramToken()
 
 	telegramBot.users = make([]*TelegramUser, 0)
@@ -85,7 +85,7 @@ func CreateTelegramBot(timeout int) (telegramBot TelegramBot, err error) {
 		return TelegramBot{}, err
 	}
 
-	telegramBot.connectionToServer, err = grpc.Dial("localhost"+configuration.GetServerAddressAndPort(), grpc.WithInsecure())
+	telegramBot.connectionToServer, err = grpc.Dial("localhost"+configuration.GetAddressPort(), grpc.WithInsecure())
 	if err != nil {
 		return TelegramBot{}, nil
 	}

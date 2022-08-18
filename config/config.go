@@ -28,24 +28,21 @@ func GetConfig() (config Config, err error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if err != nil {
-		return Config{}, err
-	}
 	if err = yaml.Unmarshal(yamlFile, &config); err != nil {
 		return Config{}, err
 	}
 	return config, nil
 }
 
-func (config *Config) GetServerAddressAndPort() string {
+func (config *Config) GetAddressPort() string {
 	return config.Server.Address + ":" + config.Server.Port
 }
 
-func (config *Config) GetServerNetwork() string {
+func (config *Config) GetNetwork() string {
 	return config.Server.Network
 }
 
-func (config *Config) GetAvailableMailServices() []string {
+func (config *Config) GetMailServices() []string {
 	return config.AvailableServices.MailNames
 }
 
@@ -53,10 +50,10 @@ func (config *Config) GetTelegramToken() string {
 	return config.TelegramBot.Token
 }
 
-func (config *Config) GetHttpServNetwork() string {
+func (config *Config) GetHttpNetwork() string {
 	return config.HTTPServer.Network
 }
 
-func (config *Config) GetHttpServAddress() string {
+func (config *Config) GetHttpAddress() string {
 	return ":" + config.HTTPServer.Address
 }
