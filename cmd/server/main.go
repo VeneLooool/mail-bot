@@ -17,6 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	serv := server.NewServer(conf)
 
 	listen, err := net.Listen(conf.GetNetwork(), conf.GetAddressPort())
