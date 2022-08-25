@@ -12,14 +12,14 @@ func TestFindUser(t *testing.T) {
 		t.Errorf("no user create already")
 	}
 }
-func TestFindMailService(t *testing.T) {
+func TestFindService(t *testing.T) {
 	testBot, err := NewTelegramBot(60)
 	if err != nil {
 		t.Error(err)
 	}
 	testUser, _ := testBot.findUserInInternalDb(0)
-	testMailService, isFound := testUser.findMailServiceInInternalDb("", "")
-	if testMailService != nil || isFound {
+	testService, isFound := testUser.findMailServiceInInternalDb("", "")
+	if testService != nil || isFound {
 		t.Errorf("critical error, find serrvice on nil")
 	}
 
